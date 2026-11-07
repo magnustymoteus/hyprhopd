@@ -99,7 +99,9 @@ pub struct Client {
 /// A workspace, as monitors and windows refer to it.
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct WorkspaceRef {
-    /// Special workspaces have negative ids; 0 means none.
+    /// Special workspaces have negative ids; 0 means none. Since Hyprland 0.57 a closed
+    /// special workspace has no id at all, which also reads as 0.
+    #[serde(default)]
     pub id: i64,
 }
 
@@ -341,6 +343,19 @@ pub mod tests {
         assert_eq!(clients[0].address, "0x55c4ecce2d70");
         assert_eq!(clients[0].workspace.id, 4);
         assert_eq!(clients[0].size, [1896, 1024]);
+    }
+
+    #[test]
+    fn a_closed_special_workspace_without_an_id_parses_as_none() {
+        // Hyprland 0.57 leaves `id` out of `specialWorkspace` when none is open.
+        let reply = r#"[{"id": 0, "name": "eDP-1", "width": 1920, "height": 1080,
+            "x": 0, "y": 0,
+            "activeWorkspace": {"address": "1", "id": 1, "type": "normal", "name": "1"},
+            "specialWorkspace": {"address": "", "type": "", "name": ""},
+            "scale": 1, "transform": 0, "focused": true}]"#;
+        let monitors: Vec<Monitor> = serde_json::from_str(reply).unwrap();
+        assert_eq!(monitors[0].active_workspace.id, 1);
+        assert_eq!(monitors[0].special_workspace.id, 0);
     }
 
     #[test]
