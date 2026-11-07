@@ -282,6 +282,25 @@ pub fn catchall_lua(name: &str) -> String {
     in_submap(name, "  hl.bind(\"catchall\", function() end)\n")
 }
 
+/// Lua that lets mouse buttons and the wheel through submap `name`. Since Hyprland 0.57 the
+/// catch-all also swallows mouse input, including hyprhopd's own clicks; it only fires when
+/// no other bind matches, so these do-nothing `non_consuming` binds keep it away.
+/// Buttons 272–279 are BTN_LEFT to BTN_TASK in linux/input-event-codes.h.
+pub fn mouse_passthrough_lua(name: &str) -> String {
+    let buttons = (272..=279).map(|code| format!("mouse:{code}"));
+    let wheel = ["mouse_up", "mouse_down", "mouse_left", "mouse_right"].map(String::from);
+    let body: String = buttons
+        .chain(wheel)
+        .map(|key| {
+            format!(
+                "  hl.bind({}, function() end, {{ non_consuming = true }})\n",
+                lua_string(&key)
+            )
+        })
+        .collect();
+    in_submap(name, &body)
+}
+
 /// The useful part of Hyprland's reply to a failed bind, like
 /// `failed to parse key string: Unknown keysym: "x"`.
 pub fn bind_error(reply: &str) -> &str {
@@ -385,6 +404,33 @@ pub mod tests {
              \x20 end)\n\
              end)\n"
         );
+    }
+
+    #[test]
+    fn mouse_input_passes_through_the_submap() {
+        let lua = mouse_passthrough_lua("hyprhopd-1");
+        assert!(lua.starts_with("hl.define_submap(\"hyprhopd-1\", function()\n"));
+        assert!(lua.ends_with("end)\n"));
+        let keys = [
+            "mouse:272",
+            "mouse:273",
+            "mouse:274",
+            "mouse:275",
+            "mouse:276",
+            "mouse:277",
+            "mouse:278",
+            "mouse:279",
+            "mouse_up",
+            "mouse_down",
+            "mouse_left",
+            "mouse_right",
+        ];
+        for key in keys {
+            let bind =
+                format!("  hl.bind(\"{key}\", function() end, {{ non_consuming = true }})\n");
+            assert!(lua.contains(&bind), "missing {bind:?} in {lua}");
+        }
+        assert_eq!(lua.matches("hl.bind(").count(), keys.len());
     }
 
     #[test]

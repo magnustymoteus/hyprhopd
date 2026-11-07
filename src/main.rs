@@ -487,6 +487,9 @@ impl State {
             self.submap = None;
             return warnings;
         }
+        if let Err(err) = hyprland::eval(&hyprland::mouse_passthrough_lua(&name)) {
+            warnings.push(format!("normal: clicks may not reach windows: {err}"));
+        }
         // Last, so it's clear every real bind went in first.
         if let Err(err) = hyprland::eval(&hyprland::catchall_lua(&name)) {
             warnings.push(format!("normal: other keys won't be blocked: {err}"));
